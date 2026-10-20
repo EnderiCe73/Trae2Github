@@ -1,0 +1,72 @@
+name: 构建 iOS 未签名 IPA
+
+on:
+  push:
+  workflow_dispatch:
+# 说明：这里不限制分支名，保证你第一次 push 一定能触发构建。
+#      若今后改用私有仓库想省额度，把上面两行换成：
+#        push:
+#          tags: ['v*']
+#        workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    # macos-latest = GitHub 托管的 macOS 标准 runner（公开仓库免费不限量）
+    runs-on: macos-latest
+
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 显示 Xcode 版本
+        run: xcodebuild -version
+
+      - name: 安装 XcodeGen
+        run: brew install xcodegen
+
+      - name: 由 project.yml 生成 Xcode 工程
+        run: xcodegen generate
+
+      - name: 缓存构建产物（加速后续构建）
+        uses: actions/cache@v4
+        with:
+          path: build
+          key: ${{ runner.os }}-dd-${{ hashFiles('project.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-dd-
+
+      - name: 无签名构建（真机 arm64）
+        run: |
+          xcodebuild \
+            -project MyiOSApp.xcodeproj \
+            -scheme MyiOSApp \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: 打包成未签名 IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/MyiOSApp.app Payload/
+          zip -qry MyiOSApp-unsigned.ipa Payload
+          ls -lh MyiOSApp-unsigned.ipa
+
+      - name: 上传成品（可下载）
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyiOSApp-unsigned-ipa
+          path: MyiOSApp-unsigned.ipa
+          retention-days: 3
+
+      - name: 打 tag 时自动挂到 Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: MyiOSApp-unsigned.ipa

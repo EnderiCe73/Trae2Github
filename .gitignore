@@ -1,0 +1,14 @@
+# Xcode / 构建产物
+build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+
+# XcodeGen 自动生成，不要提交（每次 CI 现场生成）
+MyiOSApp.xcodeproj/
+Info.plist
+
+# 成品与系统文件
+*.ipa
+.DS_Store
